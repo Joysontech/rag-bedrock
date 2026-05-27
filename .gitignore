@@ -9,6 +9,11 @@ __pycache__/
 dist/
 *.zip
 .DS_Store
+<<<<<<< Updated upstream
 tfplan
 *.tfplan
 build/
+=======
+*.tfplan
+
+>>>>>>> Stashed changes
