@@ -1,6 +1,8 @@
-.PHONY: init fmt validate plan apply destroy nuke costs pause resume snapshot-list
+.PHONY: init fmt validate plan apply destroy nuke costs pause resume snapshot-list package package-ingest package-query
 
 TF_DIR := terraform
+DIST   := dist
+SRC    := src
 
 SNAPSHOT_ID := rag-bedrock-$(shell date +%Y%m%d-%H%M%S)
 
@@ -41,9 +43,11 @@ costs:
 		--metrics UnblendedCost \
 		--filter '{"Tags":{"Key":"Project","Values":["rag-bedrock"]}}' \
 		--group-by Type=DIMENSION,Key=SERVICE \
-		--output table		
+		--output table
 
 pause:
+	@echo "Waiting for cluster to be available..."
+	@aws rds wait db-cluster-available --db-cluster-identifier rag-bedrock-cluster
 	@echo "Creating snapshot: $(SNAPSHOT_ID)"
 	@aws rds create-db-cluster-snapshot \
 		--db-cluster-identifier rag-bedrock-cluster \
@@ -66,3 +70,31 @@ resume:
 	@echo "Restore via console: RDS -> Snapshots -> select latest -> Restore"
 	@echo "Use cluster identifier: rag-bedrock-cluster"
 	@$(MAKE) snapshot-list
+
+package: package-ingest package-query
+
+package-ingest:
+	@mkdir -p $(DIST)
+	@rm -f $(DIST)/ingest.zip
+	@cd $(SRC)/ingest && \
+		if [ -s requirements.txt ] && grep -v '^\s*#' requirements.txt | grep -q .; then \
+			pip install --quiet --target build -r requirements.txt; \
+			cp handler.py build/; \
+			cd build && zip -qr ../../../$(DIST)/ingest.zip . && cd .. && rm -rf build; \
+		else \
+			zip -q ../../$(DIST)/ingest.zip handler.py; \
+		fi
+	@echo "Built $(DIST)/ingest.zip"
+
+package-query:
+	@mkdir -p $(DIST)
+	@rm -f $(DIST)/query.zip
+	@cd $(SRC)/query && \
+		if [ -s requirements.txt ] && grep -v '^\s*#' requirements.txt | grep -q .; then \
+			pip install --quiet --target build -r requirements.txt; \
+			cp handler.py build/; \
+			cd build && zip -qr ../../../$(DIST)/query.zip . && cd .. && rm -rf build; \
+		else \
+			zip -q ../../$(DIST)/query.zip handler.py; \
+		fi
+	@echo "Built $(DIST)/query.zip"

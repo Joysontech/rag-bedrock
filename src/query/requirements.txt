@@ -1,0 +1,2 @@
+# dependencies for query Lambda
+# populated in Step 7b

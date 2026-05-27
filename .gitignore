@@ -9,3 +9,6 @@ __pycache__/
 dist/
 *.zip
 .DS_Store
+tfplan
+*.tfplan
+build/

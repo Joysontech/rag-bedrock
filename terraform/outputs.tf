@@ -25,3 +25,19 @@ output "aurora_secret_arn" {
 output "aurora_database_name" {
   value = module.database.database_name
 }
+
+output "ingest_function_name" {
+  value = module.lambda.ingest_function_name
+}
+
+output "query_function_name" {
+  value = module.lambda.query_function_name
+}
+
+output "docs_bucket" {
+  value = module.lambda.docs_bucket
+}
+
+output "sessions_table" {
+  value = module.lambda.sessions_table
+}
