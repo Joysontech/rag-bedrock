@@ -76,25 +76,39 @@ package: package-ingest package-query
 package-ingest:
 	@mkdir -p $(DIST)
 	@rm -f $(DIST)/ingest.zip
-	@cd $(SRC)/ingest && \
-		if [ -s requirements.txt ] && grep -v '^\s*#' requirements.txt | grep -q .; then \
-			pip install --quiet --target build -r requirements.txt; \
-			cp handler.py build/; \
-			cd build && zip -qr ../../../$(DIST)/ingest.zip . && cd .. && rm -rf build; \
-		else \
-			zip -q ../../$(DIST)/ingest.zip handler.py; \
-		fi
-	@echo "Built $(DIST)/ingest.zip"
+	@rm -rf $(SRC)/ingest/build
+	@mkdir -p $(SRC)/ingest/build
+	@if [ -s $(SRC)/ingest/requirements.txt ] && grep -v '^\s*#' $(SRC)/ingest/requirements.txt | grep -q .; then \
+		pip install --quiet \
+			--platform manylinux2014_x86_64 \
+			--target $(SRC)/ingest/build \
+			--implementation cp \
+			--python-version 3.12 \
+			--only-binary=:all: \
+			-r $(SRC)/ingest/requirements.txt; \
+	fi
+	@cp $(SRC)/ingest/handler.py $(SRC)/ingest/build/
+	@if [ -d $(SRC)/shared ]; then cp -r $(SRC)/shared $(SRC)/ingest/build/; fi
+	@cd $(SRC)/ingest/build && zip -qr ../../../$(DIST)/ingest.zip .
+	@rm -rf $(SRC)/ingest/build
+	@echo "Built $(DIST)/ingest.zip ($$(du -h $(DIST)/ingest.zip | cut -f1))"
 
 package-query:
 	@mkdir -p $(DIST)
 	@rm -f $(DIST)/query.zip
-	@cd $(SRC)/query && \
-		if [ -s requirements.txt ] && grep -v '^\s*#' requirements.txt | grep -q .; then \
-			pip install --quiet --target build -r requirements.txt; \
-			cp handler.py build/; \
-			cd build && zip -qr ../../../$(DIST)/query.zip . && cd .. && rm -rf build; \
-		else \
-			zip -q ../../$(DIST)/query.zip handler.py; \
-		fi
-	@echo "Built $(DIST)/query.zip"
+	@rm -rf $(SRC)/query/build
+	@mkdir -p $(SRC)/query/build
+	@if [ -s $(SRC)/query/requirements.txt ] && grep -v '^\s*#' $(SRC)/query/requirements.txt | grep -q .; then \
+		pip install --quiet \
+			--platform manylinux2014_x86_64 \
+			--target $(SRC)/query/build \
+			--implementation cp \
+			--python-version 3.12 \
+			--only-binary=:all: \
+			-r $(SRC)/query/requirements.txt; \
+	fi
+	@cp $(SRC)/query/handler.py $(SRC)/query/build/
+	@if [ -d $(SRC)/shared ]; then cp -r $(SRC)/shared $(SRC)/query/build/; fi
+	@cd $(SRC)/query/build && zip -qr ../../../$(DIST)/query.zip .
+	@rm -rf $(SRC)/query/build
+	@echo "Built $(DIST)/query.zip ($$(du -h $(DIST)/query.zip | cut -f1))"
