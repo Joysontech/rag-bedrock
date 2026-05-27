@@ -81,7 +81,6 @@ resource "aws_rds_cluster_instance" "writer" {
 
   db_subnet_group_name            = aws_db_subnet_group.aurora.name
   performance_insights_enabled    = true
-  performance_insights_kms_key_id = aws_kms_key.aurora.arn
 
   tags = { Name = "${var.project}-writer" }
 }
