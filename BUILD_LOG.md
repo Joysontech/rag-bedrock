@@ -38,3 +38,13 @@
 - No cost impact, no downtime
 - TIL: not enabled by default in Terraform; AWS console-created clusters are also off by default
 
+
+## Day 4: Step 7a complete - infrastructure live
+- Full fresh build after the KMS migration cleanup
+- 35 resources created from empty state: VPC, endpoints, Aurora pgvector, Lambdas, S3, DynamoDB
+- pgvector + documents/source_files tables bootstrapped via RDS Query Editor
+- Lambda stubs respond correctly to direct invoke (ingest + query)
+- S3 -> ingest Lambda event trigger confirmed working end-to-end
+- Cold start 139ms, warm invokes 2-3ms, 36MB of 1024MB used
+- Logs flowing to CloudWatch with 7-day retention
+- Next: Step 7b - replace stubs with real RAG code
