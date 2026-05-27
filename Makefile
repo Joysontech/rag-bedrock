@@ -4,6 +4,10 @@ TF_DIR := terraform
 DIST   := dist
 SRC    := src
 
+# Use python3 -m pip for portability (Mac doesn't always have 'pip' on PATH)
+PYTHON ?= python3
+PIP    := $(PYTHON) -m pip
+
 SNAPSHOT_ID := rag-bedrock-$(shell date +%Y%m%d-%H%M%S)
 
 init:
@@ -79,7 +83,7 @@ package-ingest:
 	@rm -rf $(SRC)/ingest/build
 	@mkdir -p $(SRC)/ingest/build
 	@if [ -s $(SRC)/ingest/requirements.txt ] && grep -v '^\s*#' $(SRC)/ingest/requirements.txt | grep -q .; then \
-		pip install --quiet \
+		$(PIP) install --quiet \
 			--platform manylinux2014_x86_64 \
 			--target $(SRC)/ingest/build \
 			--implementation cp \
@@ -99,7 +103,7 @@ package-query:
 	@rm -rf $(SRC)/query/build
 	@mkdir -p $(SRC)/query/build
 	@if [ -s $(SRC)/query/requirements.txt ] && grep -v '^\s*#' $(SRC)/query/requirements.txt | grep -q .; then \
-		pip install --quiet \
+		$(PIP) install --quiet \
 			--platform manylinux2014_x86_64 \
 			--target $(SRC)/query/build \
 			--implementation cp \
