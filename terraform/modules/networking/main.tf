@@ -50,7 +50,6 @@ resource "aws_security_group" "lambda" {
   description = "Lambda functions running inside the VPC"
   vpc_id      = aws_vpc.this.id
 
-  # Aurora - scoped to VPC only
   egress {
     description = "Postgres to Aurora"
     from_port   = 5432
@@ -59,7 +58,6 @@ resource "aws_security_group" "lambda" {
     cidr_blocks = [aws_vpc.this.cidr_block]
   }
 
-  # HTTPS to VPC interface endpoints (bedrock-runtime, secretsmanager, logs)
   egress {
     description = "HTTPS to VPC interface endpoints"
     from_port   = 443
@@ -68,10 +66,6 @@ resource "aws_security_group" "lambda" {
     cidr_blocks = [aws_vpc.this.cidr_block]
   }
 
-  # HTTPS to S3 and DynamoDB gateway endpoints.
-  # Gateway endpoints route at the routing layer but the source SG still
-  # needs an outbound rule matching the destination IPs (S3/DynamoDB use
-  # public IP ranges even when accessed via gateway endpoint).
   egress {
     description = "HTTPS to S3 and DynamoDB via gateway endpoints"
     from_port   = 443
@@ -139,13 +133,14 @@ resource "aws_vpc_endpoint" "dynamodb" {
 }
 
 # ----------------------------------------------------------------------
-# Interface endpoints (hourly cost)
+# Interface endpoints (hourly cost ~£0.008/hr per endpoint per AZ)
 # ----------------------------------------------------------------------
 locals {
   interface_endpoints = [
-    "bedrock-runtime",
-    "secretsmanager",
-    "logs",
+    "bedrock-runtime",  # InvokeModel (embeddings + generation)
+    "bedrock-agent",    # GetPrompt (Prompt Management)
+    "secretsmanager",   # Aurora credentials
+    "logs",             # CloudWatch log delivery
   ]
 }
 
