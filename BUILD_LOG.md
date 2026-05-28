@@ -59,3 +59,15 @@
 - Cost per query: ~$0.0009 (Haiku 4.5 + Titan)
 - Both queries confirmed grounded, cited, correct
 - Session history (DynamoDB) confirmed working via context-dependent question
+
+## Day 5: Phase 3 - Bedrock Guardrails live
+- Guardrail ID: hy14n4r45o6f, Version 1
+- Content filters: all Medium, Prompt Attack High
+- Denied topic: personal financial advice
+- PII: Email/Phone masked, CC/NI blocked
+- Grounding: 0.75, Relevance: 0.75
+- Wired into query Lambda via GUARDRAIL_ID + GUARDRAIL_VERSION env vars
+- Normal queries pass through unaffected
+- Denied topic (stocks) blocked with message substitution
+- Prompt injection ("ignore all previous instructions") blocked
+- ManagedBy: console (Terraform import planned for Phase 6 cleanup)
