@@ -27,3 +27,14 @@ module "lambda" {
   aurora_endpoint      = module.database.cluster_endpoint
   aurora_database_name = module.database.database_name
 }
+
+module "api" {
+  source = "./modules/api"
+
+  project             = var.project
+  region              = var.region
+  query_function_arn  = module.lambda.query_function_arn
+  query_function_name = module.lambda.query_function_name
+  ingest_function_arn = module.lambda.ingest_function_arn
+  ingest_function_name = module.lambda.ingest_function_name
+}

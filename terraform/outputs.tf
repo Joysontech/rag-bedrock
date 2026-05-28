@@ -6,14 +6,6 @@ output "private_subnet_ids" {
   value = module.networking.private_subnet_ids
 }
 
-output "lambda_security_group_id" {
-  value = module.networking.lambda_security_group_id
-}
-
-output "aurora_security_group_id" {
-  value = module.networking.aurora_security_group_id
-}
-
 output "aurora_endpoint" {
   value = module.database.cluster_endpoint
 }
@@ -40,4 +32,17 @@ output "docs_bucket" {
 
 output "sessions_table" {
   value = module.lambda.sessions_table
+}
+
+output "api_endpoint" {
+  description = "HTTPS endpoint - use for all API calls"
+  value       = module.api.api_endpoint
+}
+
+output "user_pool_id" {
+  value = module.api.user_pool_id
+}
+
+output "app_client_id" {
+  value = module.api.app_client_id
 }
