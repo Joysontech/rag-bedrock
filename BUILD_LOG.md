@@ -91,3 +91,24 @@
 - Access logging to CloudWatch with 7-day retention
 - Confirmed: authenticated queries return grounded answers
 - Confirmed: unauthenticated requests return 401 Unauthorized
+
+## Day 5: Phase 6 + 7 complete - Evaluations + Knowledge Bases
+
+### Phase 6: Bedrock Evaluations
+- Eval dataset: 8 Wisley Q&A pairs in evals/wisley-eval-dataset.jsonl
+- Job: rag-bedrock-eval-wisley-v1 (LLM as judge, Sonnet judging Haiku)
+- Metrics: Correctness, Faithfulness, Completeness, Relevance
+- Check eval results in Bedrock console for scores
+
+### Phase 7: Bedrock Knowledge Bases
+- KB ID: TMBSW0OWMK (S3 Vectors vector store, Titan Embeddings v2)
+- Data source: s3://rag-bedrock-docs-061051257340/ (sync complete)
+- API route: POST /query-kb -> same Lambda, different code path
+- KB_GENERATION_MODEL_ID: claude-3-7-sonnet (RetrieveAndGenerate rejects inference profiles)
+- Fixed: docs/ prefix filter on S3 notification to prevent eval contamination
+- Comparison: DIY RAG (pgvector) vs managed KB working side by side
+
+### Key differences observed
+- DIY: markdown output, inline citations, scores, session history
+- KB: clean prose, no inline citations, no scores, no session history
+- Both correct and grounded on the same question
