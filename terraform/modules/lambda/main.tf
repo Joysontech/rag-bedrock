@@ -292,6 +292,8 @@ resource "aws_lambda_function" "query" {
 
 # ----------------------------------------------------------------------
 # S3 -> Lambda event notification
+# Only trigger for files under docs/ prefix.
+# Eval datasets, scripts, and results live outside docs/ and are ignored.
 # ----------------------------------------------------------------------
 resource "aws_lambda_permission" "s3_invoke_ingest" {
   statement_id  = "AllowS3InvokeIngest"
@@ -307,6 +309,7 @@ resource "aws_s3_bucket_notification" "docs" {
   lambda_function {
     lambda_function_arn = aws_lambda_function.ingest.arn
     events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "docs/"
   }
 
   depends_on = [aws_lambda_permission.s3_invoke_ingest]
