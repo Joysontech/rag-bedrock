@@ -109,6 +109,16 @@ data "aws_iam_policy_document" "lambda" {
   }
 
   statement {
+    sid    = "BedrockPromptGet"
+    effect = "Allow"
+    actions = ["bedrock:GetPrompt"]
+    resources = [
+      "arn:aws:bedrock:eu-west-2:061051257340:prompt/JRKRWLNLD2",
+      "arn:aws:bedrock:eu-west-2:061051257340:prompt/JRKRWLNLD2:*",
+    ]
+  }
+
+  statement {
     sid    = "SecretsRead"
     effect = "Allow"
     actions = [
@@ -204,6 +214,8 @@ locals {
     GENERATION_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
     GUARDRAIL_ID        = "hy14n4r45o6f"
     GUARDRAIL_VERSION   = "1"
+    # Versioned prompt ARN: update suffix to roll out a new prompt version
+    PROMPT_ARN          = "arn:aws:bedrock:eu-west-2:061051257340:prompt/JRKRWLNLD2:1"
     LOG_LEVEL           = "INFO"
   }
 }
