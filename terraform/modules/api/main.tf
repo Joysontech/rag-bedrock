@@ -28,7 +28,6 @@ resource "aws_cognito_user_pool" "main" {
   tags = { Name = "${var.project}-users" }
 }
 
-# App client for API auth (USER_PASSWORD_AUTH for easy testing)
 resource "aws_cognito_user_pool_client" "app" {
   name         = "${var.project}-app-client"
   user_pool_id = aws_cognito_user_pool.main.id
@@ -39,9 +38,9 @@ resource "aws_cognito_user_pool_client" "app" {
     "ALLOW_USER_SRP_AUTH",
   ]
 
-  access_token_validity  = 60   # minutes
+  access_token_validity  = 60
   id_token_validity      = 60
-  refresh_token_validity = 30   # days
+  refresh_token_validity = 30
 
   token_validity_units {
     access_token  = "minutes"
@@ -69,14 +68,12 @@ resource "aws_apigatewayv2_api" "main" {
   tags = { Name = "${var.project}-api" }
 }
 
-# CloudWatch log group for API access logs
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/aws/apigateway/${var.project}-api"
   retention_in_days = 7
   tags              = { Name = "${var.project}-api-logs" }
 }
 
-# Stage with auto-deploy and access logging
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.main.id
   name        = "$default"
@@ -84,12 +81,21 @@ resource "aws_apigatewayv2_stage" "default" {
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      routeKey       = "$context.routeKey"
+      status         = "$context.status"
+      responseLength = "$context.responseLength"
+      errorMessage   = "$context.error.message"
+    })
   }
 
   tags = { Name = "${var.project}-api-stage" }
 }
 
-# JWT Authorizer backed by Cognito
 resource "aws_apigatewayv2_authorizer" "cognito" {
   api_id           = aws_apigatewayv2_api.main.id
   authorizer_type  = "JWT"
@@ -120,7 +126,7 @@ resource "aws_apigatewayv2_integration" "ingest" {
 }
 
 # ----------------------------------------------------------------------
-# Routes (JWT-protected)
+# Routes
 # ----------------------------------------------------------------------
 resource "aws_apigatewayv2_route" "query" {
   api_id             = aws_apigatewayv2_api.main.id
@@ -139,7 +145,7 @@ resource "aws_apigatewayv2_route" "ingest" {
 }
 
 # ----------------------------------------------------------------------
-# Lambda permissions (allow API GW to invoke)
+# Lambda permissions
 # ----------------------------------------------------------------------
 resource "aws_lambda_permission" "apigw_query" {
   statement_id  = "AllowAPIGWInvokeQuery"
