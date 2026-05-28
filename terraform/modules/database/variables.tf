@@ -3,6 +3,11 @@ variable "project" {
   description = "Project name for tagging and naming"
 }
 
+variable "region" {
+  type        = string
+  description = "AWS region (for the Data API schema bootstrap)"
+}
+
 variable "vpc_id" {
   type        = string
   description = "VPC ID to deploy into"

@@ -34,16 +34,16 @@ resource "aws_rds_cluster_parameter_group" "aurora" {
 # Aurora Serverless v2 cluster
 # ----------------------------------------------------------------------
 resource "aws_rds_cluster" "aurora" {
-  cluster_identifier            = "${var.project}-cluster"
-  engine                        = "aurora-postgresql"
-  engine_mode                   = "provisioned"
-  engine_version                = var.engine_version
-  database_name                 = var.database_name
-  master_username               = var.master_username
+  cluster_identifier = "${var.project}-cluster"
+  engine             = "aurora-postgresql"
+  engine_mode        = "provisioned"
+  engine_version     = var.engine_version
+  database_name      = var.database_name
+  master_username    = var.master_username
 
-  enable_http_endpoint          = true
+  enable_http_endpoint = true
 
-  manage_master_user_password   = true
+  manage_master_user_password = true
 
   db_subnet_group_name            = aws_db_subnet_group.aurora.name
   vpc_security_group_ids          = [var.aurora_security_group_id]
@@ -59,8 +59,8 @@ resource "aws_rds_cluster" "aurora" {
   apply_immediately   = true
 
   serverlessv2_scaling_configuration {
-    min_capacity = var.min_capacity
-    max_capacity = var.max_capacity
+    min_capacity             = var.min_capacity
+    max_capacity             = var.max_capacity
     seconds_until_auto_pause = 300
   }
 
@@ -79,8 +79,31 @@ resource "aws_rds_cluster_instance" "writer" {
   engine_version     = aws_rds_cluster.aurora.engine_version
   instance_class     = "db.serverless"
 
-  db_subnet_group_name            = aws_db_subnet_group.aurora.name
-  performance_insights_enabled    = true
+  db_subnet_group_name         = aws_db_subnet_group.aurora.name
+  performance_insights_enabled = true
 
   tags = { Name = "${var.project}-writer" }
+}
+
+# ----------------------------------------------------------------------
+# Schema bootstrap via RDS Data API (idempotent, runs on cluster create)
+# ----------------------------------------------------------------------
+resource "null_resource" "schema_bootstrap" {
+  triggers = {
+    cluster_id = aws_rds_cluster.aurora.id
+    script_sha = filesha256("${path.root}/../scripts/bootstrap_db.sh")
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command = join(" ", [
+      "${path.root}/../scripts/bootstrap_db.sh",
+      aws_rds_cluster.aurora.arn,
+      aws_rds_cluster.aurora.master_user_secret[0].secret_arn,
+      aws_rds_cluster.aurora.database_name,
+      var.region,
+    ])
+  }
+
+  depends_on = [aws_rds_cluster_instance.writer]
 }
