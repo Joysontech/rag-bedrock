@@ -9,8 +9,16 @@ BEDROCK_REGION    = os.environ["BEDROCK_REGION"]
 EMBEDDING_MODEL_ID = os.environ.get(
     "EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"
 )
+
+# Main generation model (cross-region inference profile for DIY RAG path)
 GENERATION_MODEL_ID = os.environ.get(
     "GENERATION_MODEL_ID", "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+)
+
+# KB generation model: must be a direct foundation model ARN (no eu. prefix)
+# RetrieveAndGenerate does not accept cross-region inference profile IDs
+KB_GENERATION_MODEL_ID = os.environ.get(
+    "KB_GENERATION_MODEL_ID", "anthropic.claude-3-7-sonnet-20250219-v1:0"
 )
 
 GUARDRAIL_ID      = os.environ.get("GUARDRAIL_ID", "")
@@ -18,7 +26,6 @@ GUARDRAIL_VERSION = os.environ.get("GUARDRAIL_VERSION", "1")
 
 PROMPT_ARN = os.environ.get("PROMPT_ARN", "")
 
-# Bedrock Knowledge Base ID for managed RAG (POST /query-kb)
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
 
 EMBEDDING_DIMENSIONS = 1024

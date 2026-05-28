@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 import boto3
 
-from shared.config import BEDROCK_REGION, GENERATION_MODEL_ID, KNOWLEDGE_BASE_ID
+from shared.config import BEDROCK_REGION, KB_GENERATION_MODEL_ID, KNOWLEDGE_BASE_ID
 
 log = logging.getLogger(__name__)
 
@@ -18,17 +18,20 @@ def _runtime_client():
 def query_knowledge_base(question: str, num_results: int = 5) -> Dict[str, Any]:
     """
     Query a Bedrock Knowledge Base using RetrieveAndGenerate.
-    Returns answer text and source citations.
-    Uses GENERATION_MODEL_ID (same model as DIY RAG for fair comparison).
+
+    Note: modelArn must be a direct foundation model ARN - NOT a
+    cross-region inference profile ID (no eu./us. prefix).
+    RetrieveAndGenerate validates against GetInferenceProfile which
+    rejects cross-region profiles.
     """
     if not KNOWLEDGE_BASE_ID:
         raise ValueError("KNOWLEDGE_BASE_ID env var not set")
 
     model_arn = (
-        f"arn:aws:bedrock:{BEDROCK_REGION}::foundation-model/{GENERATION_MODEL_ID}"
+        f"arn:aws:bedrock:{BEDROCK_REGION}::foundation-model/{KB_GENERATION_MODEL_ID}"
     )
 
-    log.info("KB query: kb_id=%s, model=%s", KNOWLEDGE_BASE_ID, GENERATION_MODEL_ID)
+    log.info("KB query: kb=%s model=%s", KNOWLEDGE_BASE_ID, KB_GENERATION_MODEL_ID)
 
     response = _runtime_client().retrieve_and_generate(
         input={"text": question},
@@ -48,7 +51,6 @@ def query_knowledge_base(question: str, num_results: int = 5) -> Dict[str, Any]:
 
     answer = response["output"]["text"]
 
-    # Extract unique S3 source keys from citations
     sources = []
     seen = set()
     for citation in response.get("citations", []):
@@ -56,7 +58,6 @@ def query_knowledge_base(question: str, num_results: int = 5) -> Dict[str, Any]:
             uri = ref.get("location", {}).get("s3Location", {}).get("uri", "")
             if uri and uri not in seen:
                 seen.add(uri)
-                # s3://bucket/key -> key
                 key = "/".join(uri.split("/")[3:]) if uri.startswith("s3://") else uri
                 sources.append({"key": key, "source": "knowledge_base"})
 
