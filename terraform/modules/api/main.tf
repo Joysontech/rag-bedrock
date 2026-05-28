@@ -136,6 +136,14 @@ resource "aws_apigatewayv2_route" "query" {
   target             = "integrations/${aws_apigatewayv2_integration.query.id}"
 }
 
+resource "aws_apigatewayv2_route" "query_kb" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /query-kb"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+  target             = "integrations/${aws_apigatewayv2_integration.query.id}"
+}
+
 resource "aws_apigatewayv2_route" "ingest" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "POST /ingest"
@@ -153,6 +161,14 @@ resource "aws_lambda_permission" "apigw_query" {
   function_name = var.query_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*/query"
+}
+
+resource "aws_lambda_permission" "apigw_query_kb" {
+  statement_id  = "AllowAPIGWInvokeQueryKB"
+  action        = "lambda:InvokeFunction"
+  function_name = var.query_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*/query-kb"
 }
 
 resource "aws_lambda_permission" "apigw_ingest" {
