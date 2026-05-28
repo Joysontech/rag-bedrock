@@ -201,9 +201,9 @@ locals {
     DOCS_BUCKET        = aws_s3_bucket.docs.id
     BEDROCK_REGION     = var.region
     EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
-    # Claude Sonnet 4.6: current model, works directly in eu-west-2,
-    # no inference profile prefix or Marketplace subscription required.
-    GENERATION_MODEL_ID = "anthropic.claude-sonnet-4-6"
+    # Claude Haiku 4.5 via EU cross-region inference profile.
+    # Requires aws-marketplace:Subscribe on invoking principal (added to IAM user Joyson).
+    GENERATION_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
     LOG_LEVEL           = "INFO"
   }
 }
