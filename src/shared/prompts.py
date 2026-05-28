@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 _FALLBACK_TEMPLATE = """\
 Context:
 {{context}}
-{{history}}
+
 User question: {{question}}
 
 Answer using only the context above. If the answer is not in the context, \
@@ -42,7 +42,7 @@ def _fetch_template(prompt_arn: str) -> str:
         promptVersion=version,
     )
 
-    # Find the TEXT variant (there may be others for different modalities)
+    # Find the TEXT variant
     for variant in response.get("variants", []):
         cfg = variant.get("templateConfiguration", {})
         if "text" in cfg:
@@ -57,6 +57,7 @@ def render_prompt(variables: Dict[str, str], prompt_arn: str = "") -> str:
     """
     Fetch the prompt template (or use the fallback) and substitute variables.
     Variables use {{double_braces}} syntax matching the Prompt Management UI.
+    Only two variables needed: context (includes history if any) and question.
     """
     template = _fetch_template(prompt_arn) if prompt_arn else _FALLBACK_TEMPLATE
 

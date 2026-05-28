@@ -51,8 +51,8 @@ def handler(event, context):
 
     log.info("Retrieved %d chunks", len(retrieved))
 
-    history  = _load_history(session_id, limit=HISTORY_LIMIT)
-    prompt   = _build_prompt(question, retrieved, history)
+    history = _load_history(session_id, limit=HISTORY_LIMIT)
+    prompt  = _build_prompt(question, retrieved, history)
 
     try:
         answer = generate_response(prompt)
@@ -98,11 +98,13 @@ def _build_prompt(question, retrieved, history):
         for r in retrieved
     )
 
-    history_text = ""
+    # Bundle history into the context string so the prompt template
+    # only needs two variables: {{context}} and {{question}}
     if history:
-        history_text = "\nPrevious conversation:\n" + "\n".join(
+        history_lines = "\n".join(
             f"User: {h['question']}\nAssistant: {h['answer']}" for h in history
         )
+        context_text = context_text + "\n\nPrevious conversation:\n" + history_lines
 
     if PROMPT_ARN:
         log.info("Using Prompt Management: %s", PROMPT_ARN)
@@ -112,7 +114,6 @@ def _build_prompt(question, retrieved, history):
     return render_prompt(
         variables={
             "context":  context_text,
-            "history":  history_text,
             "question": question,
         },
         prompt_arn=PROMPT_ARN,
