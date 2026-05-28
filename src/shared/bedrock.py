@@ -5,6 +5,7 @@ from functools import lru_cache
 from typing import List
 
 import boto3
+from botocore.config import Config
 
 from shared.config import (
     BEDROCK_REGION,
@@ -15,10 +16,20 @@ from shared.config import (
 
 log = logging.getLogger(__name__)
 
+_BEDROCK_CONFIG = Config(
+    connect_timeout=10,
+    read_timeout=60,      # inference can take a few seconds on cold model
+    retries={"max_attempts": 2},
+)
+
 
 @lru_cache(maxsize=1)
 def _client():
-    return boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
+    return boto3.client(
+        "bedrock-runtime",
+        region_name=BEDROCK_REGION,
+        config=_BEDROCK_CONFIG,
+    )
 
 
 def get_embedding(text: str) -> List[float]:

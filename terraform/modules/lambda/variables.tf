@@ -47,6 +47,7 @@ variable "lambda_memory" {
 }
 
 variable "lambda_timeout" {
-  type    = number
-  default = 60
+  type        = number
+  default     = 300
+  description = "Timeout in seconds. 300s covers Aurora scale-to-zero wake-up + embedding calls."
 }
