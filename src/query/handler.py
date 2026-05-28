@@ -1,4 +1,4 @@
-"""Query handler: embed question, retrieve, generate, persist session."""
+"""Query handler: DIY RAG (POST /query) and KB RAG (POST /query-kb)."""
 import json
 import logging
 import os
@@ -9,6 +9,7 @@ import boto3
 from shared.bedrock import generate_response, get_embedding
 from shared.config import PROMPT_ARN
 from shared.db import vector_search
+from shared.kb import query_knowledge_base
 from shared.prompts import render_prompt
 
 log = logging.getLogger()
@@ -35,7 +36,37 @@ def handler(event, context):
     if not question:
         return _err(400, "missing question")
 
-    log.info("Query: session=%s, q=%s", session_id, question[:120])
+    # Route to Knowledge Base if called via POST /query-kb
+    route = event.get("routeKey", "")
+    if "/query-kb" in route or body.get("use_kb"):
+        return _handle_kb_query(question, session_id)
+
+    return _handle_diy_query(question, session_id)
+
+
+def _handle_kb_query(question: str, session_id: str):
+    """Managed RAG via Bedrock Knowledge Base RetrieveAndGenerate."""
+    log.info("KB query: session=%s q=%s", session_id, question[:120])
+    try:
+        result = query_knowledge_base(question)
+    except Exception as e:
+        log.exception("KB query failed")
+        return _err(500, f"kb query failed: {e}")
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "answer":     result["answer"],
+            "sources":    result["sources"],
+            "session_id": session_id,
+            "mode":       "knowledge_base",
+        }),
+    }
+
+
+def _handle_diy_query(question: str, session_id: str):
+    """DIY RAG via pgvector + Bedrock Invoke."""
+    log.info("DIY query: session=%s q=%s", session_id, question[:120])
 
     try:
         q_embedding = get_embedding(question)
@@ -50,7 +81,6 @@ def handler(event, context):
         return _err(500, f"vector search failed: {e}")
 
     log.info("Retrieved %d chunks", len(retrieved))
-
     history = _load_history(session_id, limit=HISTORY_LIMIT)
     prompt  = _build_prompt(question, retrieved, history)
 
@@ -58,7 +88,6 @@ def handler(event, context):
         answer = generate_response(prompt)
     except ValueError as e:
         if str(e).startswith("guardrail_intervened"):
-            log.warning("Guardrail blocked response for session %s", session_id)
             return {
                 "statusCode": 200,
                 "body": json.dumps({
@@ -77,17 +106,11 @@ def handler(event, context):
     return {
         "statusCode": 200,
         "body": json.dumps({
-            "answer": answer,
-            "sources": [
-                {
-                    "key": r["source"],
-                    "chunk": r["chunk_index"],
-                    "score": float(r["score"]),
-                }
-                for r in retrieved
-            ],
+            "answer":     answer,
+            "sources":    [{"key": r["source"], "chunk": r["chunk_index"], "score": float(r["score"])} for r in retrieved],
             "session_id": session_id,
             "prompt_arn": PROMPT_ARN or "fallback",
+            "mode":       "diy_rag",
         }),
     }
 
@@ -97,25 +120,14 @@ def _build_prompt(question, retrieved, history):
         f"[Source: {r['source']}, Chunk: {r['chunk_index']}]\n{r['content']}"
         for r in retrieved
     )
-
-    # Bundle history into the context string so the prompt template
-    # only needs two variables: {{context}} and {{question}}
     if history:
         history_lines = "\n".join(
             f"User: {h['question']}\nAssistant: {h['answer']}" for h in history
         )
         context_text = context_text + "\n\nPrevious conversation:\n" + history_lines
 
-    if PROMPT_ARN:
-        log.info("Using Prompt Management: %s", PROMPT_ARN)
-    else:
-        log.info("Using fallback prompt (PROMPT_ARN not set)")
-
     return render_prompt(
-        variables={
-            "context":  context_text,
-            "question": question,
-        },
+        variables={"context": context_text, "question": question},
         prompt_arn=PROMPT_ARN,
     )
 
@@ -138,21 +150,16 @@ def _save_message(session_id, question, answer):
     try:
         ts         = int(time.time() * 1000)
         expires_at = int(time.time()) + (SESSION_TTL_DAYS * 86400)
-        sessions.put_item(
-            Item={
-                "session_id": session_id,
-                "timestamp":  ts,
-                "question":   question,
-                "answer":     answer,
-                "expires_at": expires_at,
-            }
-        )
+        sessions.put_item(Item={
+            "session_id": session_id,
+            "timestamp":  ts,
+            "question":   question,
+            "answer":     answer,
+            "expires_at": expires_at,
+        })
     except Exception as e:
-        log.warning("Failed to save session message: %s", e)
+        log.warning("Failed to save session: %s", e)
 
 
 def _err(status, message):
-    return {
-        "statusCode": status,
-        "body": json.dumps({"error": message}),
-    }
+    return {"statusCode": status, "body": json.dumps({"error": message})}

@@ -1,0 +1,64 @@
+"""Bedrock Knowledge Base query using RetrieveAndGenerate API."""
+import logging
+from functools import lru_cache
+from typing import Any, Dict
+
+import boto3
+
+from shared.config import BEDROCK_REGION, GENERATION_MODEL_ID, KNOWLEDGE_BASE_ID
+
+log = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _runtime_client():
+    return boto3.client("bedrock-agent-runtime", region_name=BEDROCK_REGION)
+
+
+def query_knowledge_base(question: str, num_results: int = 5) -> Dict[str, Any]:
+    """
+    Query a Bedrock Knowledge Base using RetrieveAndGenerate.
+    Returns answer text and source citations.
+    Uses GENERATION_MODEL_ID (same model as DIY RAG for fair comparison).
+    """
+    if not KNOWLEDGE_BASE_ID:
+        raise ValueError("KNOWLEDGE_BASE_ID env var not set")
+
+    model_arn = (
+        f"arn:aws:bedrock:{BEDROCK_REGION}::foundation-model/{GENERATION_MODEL_ID}"
+    )
+
+    log.info("KB query: kb_id=%s, model=%s", KNOWLEDGE_BASE_ID, GENERATION_MODEL_ID)
+
+    response = _runtime_client().retrieve_and_generate(
+        input={"text": question},
+        retrieveAndGenerateConfiguration={
+            "type": "KNOWLEDGE_BASE",
+            "knowledgeBaseConfiguration": {
+                "knowledgeBaseId": KNOWLEDGE_BASE_ID,
+                "modelArn": model_arn,
+                "retrievalConfiguration": {
+                    "vectorSearchConfiguration": {
+                        "numberOfResults": num_results,
+                    }
+                },
+            },
+        },
+    )
+
+    answer = response["output"]["text"]
+
+    # Extract unique S3 source keys from citations
+    sources = []
+    seen = set()
+    for citation in response.get("citations", []):
+        for ref in citation.get("retrievedReferences", []):
+            uri = ref.get("location", {}).get("s3Location", {}).get("uri", "")
+            if uri and uri not in seen:
+                seen.add(uri)
+                # s3://bucket/key -> key
+                key = "/".join(uri.split("/")[3:]) if uri.startswith("s3://") else uri
+                sources.append({"key": key, "source": "knowledge_base"})
+
+    log.info("KB answer: %d chars, %d sources", len(answer), len(sources))
+    return {"answer": answer, "sources": sources}
