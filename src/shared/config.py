@@ -2,22 +2,25 @@
 import os
 
 AURORA_SECRET_ARN = os.environ["AURORA_SECRET_ARN"]
-AURORA_ENDPOINT = os.environ["AURORA_ENDPOINT"]
-AURORA_DATABASE = os.environ["AURORA_DATABASE"]
-BEDROCK_REGION = os.environ["BEDROCK_REGION"]
+AURORA_ENDPOINT   = os.environ["AURORA_ENDPOINT"]
+AURORA_DATABASE   = os.environ["AURORA_DATABASE"]
+BEDROCK_REGION    = os.environ["BEDROCK_REGION"]
 
 EMBEDDING_MODEL_ID = os.environ.get(
     "EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"
 )
-
 GENERATION_MODEL_ID = os.environ.get(
     "GENERATION_MODEL_ID", "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 )
 
 # Guardrail config (set after creating in Bedrock console)
-# Leave empty strings to disable guardrail during development
 GUARDRAIL_ID      = os.environ.get("GUARDRAIL_ID", "")
 GUARDRAIL_VERSION = os.environ.get("GUARDRAIL_VERSION", "1")
+
+# Prompt Management config
+# Set to versioned ARN e.g. arn:aws:bedrock:...:prompt/ID:1
+# Leave empty to use the built-in fallback prompt
+PROMPT_ARN = os.environ.get("PROMPT_ARN", "")
 
 # Embedding dimensions must match pgvector index (1024 for Titan v2)
 EMBEDDING_DIMENSIONS = 1024

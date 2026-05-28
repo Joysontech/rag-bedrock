@@ -7,7 +7,9 @@ import time
 import boto3
 
 from shared.bedrock import generate_response, get_embedding
+from shared.config import PROMPT_ARN
 from shared.db import vector_search
+from shared.prompts import render_prompt
 
 log = logging.getLogger()
 log.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
@@ -49,8 +51,8 @@ def handler(event, context):
 
     log.info("Retrieved %d chunks", len(retrieved))
 
-    history = _load_history(session_id, limit=HISTORY_LIMIT)
-    prompt  = _build_prompt(question, retrieved, history)
+    history  = _load_history(session_id, limit=HISTORY_LIMIT)
+    prompt   = _build_prompt(question, retrieved, history)
 
     try:
         answer = generate_response(prompt)
@@ -60,7 +62,7 @@ def handler(event, context):
             return {
                 "statusCode": 200,
                 "body": json.dumps({
-                    "answer": "I\'m not able to answer that question.",
+                    "answer": "I'm not able to answer that question.",
                     "guardrail_action": "BLOCKED",
                     "session_id": session_id,
                 }),
@@ -85,6 +87,7 @@ def handler(event, context):
                 for r in retrieved
             ],
             "session_id": session_id,
+            "prompt_arn": PROMPT_ARN or "fallback",
         }),
     }
 
@@ -97,18 +100,23 @@ def _build_prompt(question, retrieved, history):
 
     history_text = ""
     if history:
-        history_text = "\n\nPrevious conversation:\n" + "\n".join(
+        history_text = "\nPrevious conversation:\n" + "\n".join(
             f"User: {h['question']}\nAssistant: {h['answer']}" for h in history
         )
 
-    return f"""You are a helpful assistant answering questions using only the provided context.
+    if PROMPT_ARN:
+        log.info("Using Prompt Management: %s", PROMPT_ARN)
+    else:
+        log.info("Using fallback prompt (PROMPT_ARN not set)")
 
-Context:
-{context_text}{history_text}
-
-User question: {question}
-
-Answer using only the context above. If the answer is not in the context, say \"I don't have enough information to answer.\" Cite sources inline as [source-key]."""
+    return render_prompt(
+        variables={
+            "context":  context_text,
+            "history":  history_text,
+            "question": question,
+        },
+        prompt_arn=PROMPT_ARN,
+    )
 
 
 def _load_history(session_id, limit=5):
