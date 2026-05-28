@@ -71,3 +71,12 @@
 - Denied topic (stocks) blocked with message substitution
 - Prompt injection ("ignore all previous instructions") blocked
 - ManagedBy: console (Terraform import planned for Phase 6 cleanup)
+
+## Day 5: Phase 4 complete - Bedrock Prompt Management wired
+- Prompt: rag-query-generate (ID: JRKRWLNLD2, Version 1)
+- VPC endpoint added for bedrock-agent (GetPrompt API)
+- Template type: CHAT (console builder format), handled in prompts.py
+- prompt_arn returned in every response for auditability
+- Template cached via lru_cache, zero extra latency on warm invocations
+- Quality improvement: structured markdown answers from system instructions
+- To roll out new prompt version: edit console, create v2, bump PROMPT_ARN :1 -> :2, apply
