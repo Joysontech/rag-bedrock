@@ -1,16 +1,15 @@
 # ----------------------------------------------------------------------
-# Random suffix for globally-unique S3 bucket
+# Account identity for deterministic, globally-unique bucket naming
 # ----------------------------------------------------------------------
-resource "random_id" "bucket_suffix" {
-  byte_length = 4
-}
+data "aws_caller_identity" "current" {}
 
 # ----------------------------------------------------------------------
 # S3 bucket for source documents
 # ----------------------------------------------------------------------
 resource "aws_s3_bucket" "docs" {
-  bucket = "${var.project}-docs-${random_id.bucket_suffix.hex}"
-  tags   = { Name = "${var.project}-docs" }
+  bucket        = "${var.project}-docs-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true # dev project: allow destroy even with objects present
+  tags          = { Name = "${var.project}-docs" }
 }
 
 resource "aws_s3_bucket_versioning" "docs" {
