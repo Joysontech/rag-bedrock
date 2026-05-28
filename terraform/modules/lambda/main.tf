@@ -194,15 +194,15 @@ resource "aws_cloudwatch_log_group" "query" {
 # ----------------------------------------------------------------------
 locals {
   common_env = {
-    AURORA_SECRET_ARN = var.aurora_secret_arn
-    AURORA_ENDPOINT   = var.aurora_endpoint
-    AURORA_DATABASE   = var.aurora_database_name
-    SESSIONS_TABLE    = aws_dynamodb_table.sessions.name
-    DOCS_BUCKET       = aws_s3_bucket.docs.id
-    BEDROCK_REGION    = var.region
+    AURORA_SECRET_ARN  = var.aurora_secret_arn
+    AURORA_ENDPOINT    = var.aurora_endpoint
+    AURORA_DATABASE    = var.aurora_database_name
+    SESSIONS_TABLE     = aws_dynamodb_table.sessions.name
+    DOCS_BUCKET        = aws_s3_bucket.docs.id
+    BEDROCK_REGION     = var.region
     EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
-    # Claude Haiku 4.5 requires cross-region inference profile (eu. prefix for EU regions)
-    GENERATION_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+    # Claude 3.5 Haiku: fast, cheap, no Marketplace subscription required
+    GENERATION_MODEL_ID = "anthropic.claude-3-5-haiku-20241022-v1:0"
     LOG_LEVEL           = "INFO"
   }
 }
