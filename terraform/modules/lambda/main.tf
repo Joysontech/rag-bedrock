@@ -201,9 +201,9 @@ locals {
     DOCS_BUCKET        = aws_s3_bucket.docs.id
     BEDROCK_REGION     = var.region
     EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
-    # Claude 3 Haiku: available in all Bedrock regions including eu-west-2,
-    # no Marketplace subscription required.
-    GENERATION_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+    # Claude Sonnet 4.6: current model, works directly in eu-west-2,
+    # no inference profile prefix or Marketplace subscription required.
+    GENERATION_MODEL_ID = "anthropic.claude-sonnet-4-6"
     LOG_LEVEL           = "INFO"
   }
 }
