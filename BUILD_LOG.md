@@ -80,3 +80,14 @@
 - Template cached via lru_cache, zero extra latency on warm invocations
 - Quality improvement: structured markdown answers from system instructions
 - To roll out new prompt version: edit console, create v2, bump PROMPT_ARN :1 -> :2, apply
+
+## Day 5: Phase 5 complete - API Gateway + Cognito live
+- API endpoint: https://fhrmsijhl2.execute-api.eu-west-2.amazonaws.com
+- Cognito User Pool: eu-west-2_nQp4HboCq
+- App Client: 6q0oh7gotldjvks56him9p6d48
+- Routes: POST /query, POST /ingest (both JWT-protected)
+- JWT authorizer: Cognito IdToken in Authorization header
+- CORS enabled for future frontend
+- Access logging to CloudWatch with 7-day retention
+- Confirmed: authenticated queries return grounded answers
+- Confirmed: unauthenticated requests return 401 Unauthorized
