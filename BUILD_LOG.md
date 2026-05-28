@@ -48,3 +48,14 @@
 - Cold start 139ms, warm invokes 2-3ms, 36MB of 1024MB used
 - Logs flowing to CloudWatch with 7-day retention
 - Next: Step 7b - replace stubs with real RAG code
+
+## Day 4-5: Step 7b complete - real RAG handlers
+- Ingest: S3 trigger, Titan embed, pgvector upsert (idempotent per source)
+- Query: vector search top-5, DynamoDB session history, Claude Haiku 4.5 generation
+- Model: eu.anthropic.claude-haiku-4-5-20251001-v1:0 (EU inference profile)
+- Embedding: amazon.titan-embed-text-v2:0 (1024 dims)
+- Fixes: Lambda SG egress for gateway endpoints, Aurora retry loop,
+  Marketplace permissions on IAM user Joyson
+- Cost per query: ~$0.0009 (Haiku 4.5 + Titan)
+- Both queries confirmed grounded, cited, correct
+- Session history (DynamoDB) confirmed working via context-dependent question
