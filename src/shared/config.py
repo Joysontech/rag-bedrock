@@ -10,11 +10,14 @@ EMBEDDING_MODEL_ID = os.environ.get(
     "EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"
 )
 
-# EU cross-region inference profile for Claude Haiku 4.5.
-# Requires aws-marketplace:Subscribe on the invoking principal (one-time account setup).
 GENERATION_MODEL_ID = os.environ.get(
     "GENERATION_MODEL_ID", "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 )
+
+# Guardrail config (set after creating in Bedrock console)
+# Leave empty strings to disable guardrail during development
+GUARDRAIL_ID      = os.environ.get("GUARDRAIL_ID", "")
+GUARDRAIL_VERSION = os.environ.get("GUARDRAIL_VERSION", "1")
 
 # Embedding dimensions must match pgvector index (1024 for Titan v2)
 EMBEDDING_DIMENSIONS = 1024
