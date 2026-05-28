@@ -59,7 +59,7 @@ def query_knowledge_base(question: str, num_results: int = 5) -> Dict[str, Any]:
             if uri and uri not in seen:
                 seen.add(uri)
                 key = "/".join(uri.split("/")[3:]) if uri.startswith("s3://") else uri
-                sources.append({"key": key, "source": "knowledge_base"})
+                sources.append({"key": key})
 
     log.info("KB answer: %d chars, %d sources", len(answer), len(sources))
     return {"answer": answer, "sources": sources}
