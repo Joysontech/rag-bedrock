@@ -10,8 +10,8 @@ EMBEDDING_MODEL_ID = os.environ.get(
     "EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"
 )
 
-# Claude Haiku 4.5 requires a cross-region inference profile.
-# EU profile for eu-west-* and eu-central-* regions.
+# EU cross-region inference profile for Claude Haiku 4.5.
+# Requires aws-marketplace:Subscribe on the invoking principal (one-time account setup).
 GENERATION_MODEL_ID = os.environ.get(
     "GENERATION_MODEL_ID", "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 )
