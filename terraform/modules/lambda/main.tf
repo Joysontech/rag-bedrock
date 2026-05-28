@@ -214,19 +214,22 @@ resource "aws_cloudwatch_log_group" "query" {
 # ----------------------------------------------------------------------
 locals {
   common_env = {
-    AURORA_SECRET_ARN   = var.aurora_secret_arn
-    AURORA_ENDPOINT     = var.aurora_endpoint
-    AURORA_DATABASE     = var.aurora_database_name
-    SESSIONS_TABLE      = aws_dynamodb_table.sessions.name
-    DOCS_BUCKET         = aws_s3_bucket.docs.id
-    BEDROCK_REGION      = var.region
-    EMBEDDING_MODEL_ID  = "amazon.titan-embed-text-v2:0"
-    GENERATION_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
-    GUARDRAIL_ID        = "hy14n4r45o6f"
-    GUARDRAIL_VERSION   = "1"
-    PROMPT_ARN          = "arn:aws:bedrock:eu-west-2:061051257340:prompt/JRKRWLNLD2:1"
-    KNOWLEDGE_BASE_ID   = "TMBSW0OWMK"
-    LOG_LEVEL           = "INFO"
+    AURORA_SECRET_ARN      = var.aurora_secret_arn
+    AURORA_ENDPOINT        = var.aurora_endpoint
+    AURORA_DATABASE        = var.aurora_database_name
+    SESSIONS_TABLE         = aws_dynamodb_table.sessions.name
+    DOCS_BUCKET            = aws_s3_bucket.docs.id
+    BEDROCK_REGION         = var.region
+    EMBEDDING_MODEL_ID     = "amazon.titan-embed-text-v2:0"
+    # DIY RAG uses cross-region inference profile (cheaper Haiku 4.5)
+    GENERATION_MODEL_ID    = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+    # KB path uses direct foundation model ID (RetrieveAndGenerate rejects inference profiles)
+    KB_GENERATION_MODEL_ID = "anthropic.claude-3-7-sonnet-20250219-v1:0"
+    GUARDRAIL_ID           = "hy14n4r45o6f"
+    GUARDRAIL_VERSION      = "1"
+    PROMPT_ARN             = "arn:aws:bedrock:eu-west-2:061051257340:prompt/JRKRWLNLD2:1"
+    KNOWLEDGE_BASE_ID      = "TMBSW0OWMK"
+    LOG_LEVEL              = "INFO"
   }
 }
 
@@ -293,7 +296,6 @@ resource "aws_lambda_function" "query" {
 # ----------------------------------------------------------------------
 # S3 -> Lambda event notification
 # Only trigger for files under docs/ prefix.
-# Eval datasets, scripts, and results live outside docs/ and are ignored.
 # ----------------------------------------------------------------------
 resource "aws_lambda_permission" "s3_invoke_ingest" {
   statement_id  = "AllowS3InvokeIngest"
