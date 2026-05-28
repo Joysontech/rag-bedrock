@@ -112,3 +112,22 @@
 - DIY: markdown output, inline citations, scores, session history
 - KB: clean prose, no inline citations, no scores, no session history
 - Both correct and grounded on the same question
+
+## Comparison: DIY RAG vs Knowledge Bases (same question, same data)
+
+Both return factually correct, grounded answers on "What is the Wisley Plant Centre known for?"
+
+DIY RAG advantages:
+- Inline citations, similarity scores, chunk indices
+- Prompt Management audit trail (prompt_arn in every response)
+- DynamoDB session history for multi-turn conversations
+- Full chunking control (800 tokens vs KB's fixed 300)
+- Any embedding/model combination
+
+Knowledge Base advantages:
+- Zero infrastructure: no pgvector, no ingest Lambda, no VPC complexity
+- Built-in sync (just point at S3, Bedrock handles ingestion)
+- No cold start on schema bootstrap
+
+Verdict: same answer quality, different observability. Choose KB for
+simplicity, DIY for production observability and control.
