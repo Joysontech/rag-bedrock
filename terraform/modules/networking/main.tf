@@ -133,14 +133,15 @@ resource "aws_vpc_endpoint" "dynamodb" {
 }
 
 # ----------------------------------------------------------------------
-# Interface endpoints (hourly cost ~£0.008/hr per endpoint per AZ)
+# Interface endpoints
 # ----------------------------------------------------------------------
 locals {
   interface_endpoints = [
-    "bedrock-runtime",  # InvokeModel (embeddings + generation)
-    "bedrock-agent",    # GetPrompt (Prompt Management)
-    "secretsmanager",   # Aurora credentials
-    "logs",             # CloudWatch log delivery
+    "bedrock-runtime",       # InvokeModel (embeddings + generation)
+    "bedrock-agent",         # GetPrompt (Prompt Management)
+    "bedrock-agent-runtime", # RetrieveAndGenerate (Knowledge Bases)
+    "secretsmanager",        # Aurora credentials
+    "logs",                  # CloudWatch log delivery
   ]
 }
 
