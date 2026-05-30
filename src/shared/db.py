@@ -6,8 +6,8 @@ from functools import lru_cache
 from typing import Any, Dict, List
 
 import boto3
-import psycopg
-from psycopg.rows import dict_row
+import psycopg2
+import psycopg2.extras
 
 from shared.config import AURORA_DATABASE, AURORA_ENDPOINT, AURORA_SECRET_ARN
 
@@ -17,7 +17,7 @@ _connection = None
 
 _MAX_CONNECT_RETRIES = 8
 _CONNECT_RETRY_DELAY = 15    # seconds between retries
-_CONNECT_TIMEOUT = 20        # seconds per individual attempt
+_CONNECT_TIMEOUT    = 20     # seconds per individual attempt
 
 
 @lru_cache(maxsize=1)
@@ -29,7 +29,7 @@ def _get_db_credentials():
 
 
 def get_connection():
-    """Return a live psycopg connection. Retries for Aurora scale-to-zero wake-up."""
+    """Return a live psycopg2 connection. Retries for Aurora scale-to-zero wake-up."""
     global _connection
 
     if _connection is not None:
@@ -37,7 +37,7 @@ def get_connection():
             with _connection.cursor() as cur:
                 cur.execute("SELECT 1")
             return _connection
-        except (psycopg.OperationalError, psycopg.InterfaceError):
+        except (psycopg2.OperationalError, psycopg2.InterfaceError):
             log.info("Stale connection detected, will reconnect")
             try:
                 _connection.close()
@@ -54,7 +54,7 @@ def get_connection():
                 "Aurora connect attempt %d/%d (host=%s)",
                 attempt, _MAX_CONNECT_RETRIES, AURORA_ENDPOINT,
             )
-            _connection = psycopg.connect(
+            _connection = psycopg2.connect(
                 host=AURORA_ENDPOINT,
                 port=5432,
                 dbname=AURORA_DATABASE,
@@ -104,14 +104,12 @@ def insert_chunks(chunks: List[Dict[str, Any]], source: str) -> int:
 
         cur.execute(
             """
-            INSERT INTO source_files (s3_key, chunk_count, ingested_at, metadata)
-            VALUES (%s, %s, now(), %s::jsonb)
+            INSERT INTO source_files (s3_key, ingested_at)
+            VALUES (%s, now())
             ON CONFLICT (s3_key) DO UPDATE SET
-                chunk_count = EXCLUDED.chunk_count,
-                ingested_at = EXCLUDED.ingested_at,
-                metadata    = EXCLUDED.metadata
+                ingested_at = EXCLUDED.ingested_at
             """,
-            (source, len(chunks), json.dumps({})),
+            (source,),
         )
 
     conn.commit()
@@ -122,7 +120,7 @@ def vector_search(query_embedding: List[float], top_k: int = 5) -> List[Dict[str
     """Cosine similarity search. Returns list of dicts with score."""
     conn = get_connection()
 
-    with conn.cursor(row_factory=dict_row) as cur:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
             SELECT
@@ -138,4 +136,4 @@ def vector_search(query_embedding: List[float], top_k: int = 5) -> List[Dict[str
             """,
             (str(query_embedding), str(query_embedding), top_k),
         )
-        return cur.fetchall()
+        return [dict(row) for row in cur.fetchall()]
