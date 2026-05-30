@@ -1,6 +1,6 @@
 # rag-bedrock
 
-Production-shaped RAG system on AWS Bedrock — built entirely via the **AWS console**, no Terraform or CDK required.
+Production-shaped RAG system on AWS Bedrock.
 
 Built as hands-on prep for the **AWS Certified Generative AI Developer Professional (AIP-C01)** certification.
 
