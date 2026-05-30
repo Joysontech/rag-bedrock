@@ -409,11 +409,9 @@ rm -rf ~/Desktop/lambda-packages
 mkdir -p ~/Desktop/lambda-packages/ingest-package
 mkdir -p ~/Desktop/lambda-packages/query-package
 
-# Ingest Lambda
+# Ingest Lambda — pure Python driver, no platform flags needed
 pip3 install -r src/ingest/requirements.txt \
-  -t ~/Desktop/lambda-packages/ingest-package \
-  --platform manylinux2014_x86_64 \
-  --only-binary=:all:
+  -t ~/Desktop/lambda-packages/ingest-package
 cp src/ingest/handler.py ~/Desktop/lambda-packages/ingest-package/
 cp -r src/shared ~/Desktop/lambda-packages/ingest-package/
 cd ~/Desktop/lambda-packages/ingest-package
@@ -422,18 +420,16 @@ cd ~/rag-bedrock
 
 # Query Lambda
 pip3 install -r src/query/requirements.txt \
-  -t ~/Desktop/lambda-packages/query-package \
-  --platform manylinux2014_x86_64 \
-  --only-binary=:all:
+  -t ~/Desktop/lambda-packages/query-package
 cp src/query/handler.py ~/Desktop/lambda-packages/query-package/
 cp -r src/shared ~/Desktop/lambda-packages/query-package/
 cd ~/Desktop/lambda-packages/query-package
 zip -r ~/Desktop/lambda-packages/query.zip .
 cd ~/rag-bedrock
 
-# Verify psycopg is in both zips
-echo "=== ingest.zip ===" && unzip -l ~/Desktop/lambda-packages/ingest.zip | grep psycopg
-echo "=== query.zip ===" && unzip -l ~/Desktop/lambda-packages/query.zip | grep psycopg
+# Verify pg8000 is in both zips
+echo "=== ingest.zip ===" && unzip -l ~/Desktop/lambda-packages/ingest.zip | grep pg8000
+echo "=== query.zip ===" && unzip -l ~/Desktop/lambda-packages/query.zip | grep pg8000
 ```
 
 Both `ingest.zip` and `query.zip` will be on your Desktop inside `lambda-packages/`.
@@ -446,9 +442,10 @@ Both `ingest.zip` and `query.zip` will be on your Desktop inside `lambda-package
 4. Execution role: **Use an existing role** → `rag-bedrock-lambda-role`
 5. Create function
 6. **Code** tab → **Upload from → .zip file** → upload `ingest.zip`
-7. **Configuration → General configuration** → Edit: Memory **1024 MB**, Timeout **5 min**, Handler `handler.handler`
-8. **Configuration → VPC** → Edit: your VPC, both private subnets, `rag-bedrock-lambda-sg`
-9. **Configuration → Environment variables** → Add:
+7. **Code** tab → scroll to **Runtime settings** → **Edit** → Handler: `handler.handler` → Save
+8. **Configuration → General configuration** → Edit: Memory **1024 MB**, Timeout **5 min**
+9. **Configuration → VPC** → Edit: your VPC, both private subnets, `rag-bedrock-lambda-sg`
+10. **Configuration → Environment variables** → Add:
 
 | Key | Value |
 |-----|-------|
@@ -463,11 +460,14 @@ Both `ingest.zip` and `query.zip` will be on your Desktop inside `lambda-package
 
 > 📸 **Screenshot**: Lambda VPC configuration showing private subnets and security group
 
+> **Important**: The default handler in the Lambda console is `lambda_function.lambda_handler`. You must change it to `handler.handler` via the **Runtime settings** section on the Code tab. Without this change the Lambda will fail with `No module named 'lambda_function'`.
+
 ### 4.4 Create the Query Lambda
 
 Same steps as the Ingest Lambda with:
 - Function name: `rag-bedrock-query`
 - Upload `query.zip`
+- Handler: `handler.handler` (same change required)
 - Same env vars plus:
 
 | Key | Value |
@@ -496,12 +496,11 @@ Same steps as the Ingest Lambda with:
 
 With the Ingest Lambda deployed and the S3 trigger configured, the ingestion pipeline is fully working. You do **not** need API Gateway or Cognito for this step — ingestion runs entirely on the S3 → Lambda → Bedrock Titan → Aurora path.
 
-Upload the AIP-C01 exam guide from the repo:
+Upload the AIP-C01 exam guide from the repo via the S3 console:
 
-```bash
-aws s3 cp docs/aip-c01-exam-guide.md \
-  s3://rag-bedrock-docs-YOURACCOUNTID/docs/aip-c01-exam-guide.md
-```
+1. S3 console → your bucket → click into the `docs/` folder
+2. **Upload → Add files** → select `docs/aip-c01-exam-guide.md` from the repo
+3. Upload
 
 The upload triggers the Ingest Lambda automatically. Watch it process:
 
@@ -528,7 +527,7 @@ GROUP BY source;
 
 You should see `docs/aip-c01-exam-guide.md` with several rows. Once this returns data, your RAG system has something to retrieve from and you can continue to Phase 5.
 
-> **Why this document**: The exam guide covers all five AIP-C01 domains with detailed factual content. Once ingested, you can ask the RAG system questions like "Which VPC endpoint enables the Knowledge Bases API?" or "When should I use RAG instead of fine-tuning?" — and get grounded, cited answers drawn directly from the document. That makes for a much stronger blog demo than a generic dataset.
+> **Why this document**: The exam guide covers all five AIP-C01 domains with detailed factual content. Once ingested, you can ask the RAG system questions like "Which VPC endpoint enables the Knowledge Bases API?" or "What percentage of the exam does Domain 1 cover?" and get grounded, cited answers drawn directly from the document.
 
 > **Why the docs/ prefix matters**: The S3 event notification is filtered to `docs/` only. If you later upload eval datasets or results files to `evals/`, they will not trigger ingestion and cannot contaminate your vector store. Without this filter, every file upload into the bucket gets embedded — a subtle but common production data quality issue.
 
@@ -544,17 +543,20 @@ You should see `docs/aip-c01-exam-guide.md` with several rows. Once this returns
 4. MFA: **No MFA**
 5. Self-registration: disable (you will create the test user manually)
 6. User pool name: `rag-bedrock-users`
-7. App client name: `rag-bedrock-app`
-8. Auth flows: enable **ALLOW_USER_PASSWORD_AUTH** and **ALLOW_REFRESH_TOKEN_AUTH**
-9. Access token expiry: **60 minutes**, Refresh token: **30 days**
-10. Create user pool
+7. App client:
+   - App type: **Public client** (no secret — required for CLI token requests)
+   - App client name: `rag-bedrock-cli`
+   - Auth flows: enable **ALLOW_USER_PASSWORD_AUTH** and **ALLOW_REFRESH_TOKEN_AUTH**
+   - Client secret: **toggle OFF** (critical — a secret requires a HMAC on every auth call)
+8. Access token expiry: **60 minutes**, Refresh token: **30 days**
+9. Create user pool
 
 Note the **User Pool ID** and **App client ID**.
 
 **Create and confirm a test user:**
 
 ```bash
-# Create the user
+# Create the user (note: --user-attributes required when email is a required field)
 aws cognito-idp sign-up \
   --client-id YOUR_CLIENT_ID \
   --username your@email.com \
@@ -562,7 +564,7 @@ aws cognito-idp sign-up \
   --user-attributes Name=email,Value=your@email.com \
   --region eu-west-2
 
-# Set password as permanent (skips forced reset)
+# Set password as permanent (skips the forced reset flow)
 aws cognito-idp admin-set-user-password \
   --user-pool-id YOUR_POOL_ID \
   --username your@email.com \
@@ -572,6 +574,8 @@ aws cognito-idp admin-set-user-password \
 ```
 
 > 📸 **Screenshot**: Cognito user showing Confirmed status
+
+> **Important**: The console creates a confidential client with a secret by default when you choose "Traditional web application". Always create a **Public client** with the secret toggle off for CLI and API testing. A client secret requires computing a SECRET_HASH on every auth call — not supported by the plain `initiate-auth` CLI command.
 
 ### 5.2 Create the API Gateway HTTP API
 
@@ -626,20 +630,23 @@ Note the **Guardrail ID**. Update Query Lambda env vars:
 
 > 📸 **Screenshot**: Contextual grounding configuration with 0.75 thresholds
 
-> **AIP-C01 note**: Contextual grounding checks the answer against the retrieved context, not against ground truth. Threshold 0.75 means answers less than 75% supported by context are blocked — catching hallucinations before they reach the user.
+> **AIP-C01 note**: Contextual grounding checks the answer against the retrieved context, not against ground truth. Threshold 0.75 means answers less than 75% supported by context are blocked — catching hallucinations before they reach the user. This is particularly important for document-grounded Q&A: if the answer contains a claim that isn't clearly supported by the retrieved chunks, the Guardrail blocks it and substitutes a safe message.
 
 ---
 
 ## Phase 7: Bedrock Prompt Management
 
+Prompt Management versions your system prompt like code. Instead of hardcoding it in Lambda, it lives in Bedrock with a version history and an audit trail in every API response.
+
 1. **Bedrock console → Prompt management → Create prompt**
 2. Name: `rag-query-generate`
-3. Model: Claude Haiku 4.5, Temperature: **0.2**, Max tokens: **1024**
-4. System instructions:
+3. Description: `RAG generation prompt for AIP-C01 exam guide Q&A`
+4. Model: Claude Haiku 4.5, Temperature: **0.2**, Max tokens: **1024**
+5. System instructions:
 ```
-You are a helpful assistant answering questions using only the provided context. Never use outside knowledge. Cite sources inline as [source-key].
+You are a helpful assistant answering questions about AWS certifications and cloud services using only the provided context. Never use outside knowledge. Cite sources inline as [source-key].
 ```
-5. User message:
+6. User message:
 ```
 Context:
 {{context}}
@@ -648,17 +655,27 @@ User question: {{question}}
 
 Answer using only the context above. If the answer is not in the context, say "I don't have enough information to answer that." Cite sources inline as [source-key].
 ```
-6. Delete the Assistant message field if it appears (empty block causes a validation error)
-7. Test with sample values → Run → **Create version**
+7. Delete the Assistant message field if it appears (empty block causes a `ContentBlock is blank` validation error)
+8. In the **Test variables** section fill in:
+   - **context**: `[Source: docs/aip-c01-exam-guide.md] The AIP-C01 exam is divided into five domains. Domain 1: Foundation Model Integration and Data Management covers 31% of the exam. Domain 2: GenAI Application Implementation and Integration covers 26%. Domain 3: AI Safety, Security and Governance covers 20%. Domain 4: Operational Excellence and Efficiency covers 12%. Domain 5: Testing, Validation and Troubleshooting covers 11%.`
+   - **question**: `What percentage of the AIP-C01 exam does Domain 1 cover?`
+9. Click **Run** — expected answer: Domain 1 covers 31%
+10. Click **Create version** → note the **Prompt ARN**
 
-Note the **Prompt ARN**. Update Query Lambda:
+> 📸 **Screenshot**: Prompt Management builder showing system instructions, two variables, and a successful test run
+
+Update Query Lambda:
 - `PROMPT_ARN` = `arn:aws:bedrock:eu-west-2:ACCOUNTID:prompt/PROMPTID:1`
 
-> 📸 **Screenshot**: Prompt Management builder showing system instructions and variables
+> **AIP-C01 note — prompt versioning workflow**: To roll out a new prompt without redeploying Lambda: edit in the console → create version 2 → update the Lambda env var `PROMPT_ARN` from `:1` to `:2`. The `prompt_arn` field in every API response provides a complete audit trail: you know exactly which prompt version generated any given answer.
+
+> **Gotcha**: The console prompt builder creates CHAT-type prompts (with system instructions + message turns), not TEXT-type. The Lambda code in this repo handles both types.
 
 ---
 
 ## Phase 8: Bedrock Knowledge Bases
+
+Knowledge Bases are the managed alternative to your DIY pgvector pipeline. Bedrock handles chunking, embedding, indexing, retrieval, and generation. Compare it against your DIY system on the same question.
 
 1. **Bedrock console → Knowledge bases → Create**
 2. Name: `rag-bedrock-kb`
@@ -675,50 +692,81 @@ Note the **Knowledge Base ID**. Update Query Lambda:
 
 > 📸 **Screenshot**: Knowledge Base showing S3 Vectors vector store and Sync Complete status
 
-### DIY RAG vs Knowledge Bases
+**Run the side-by-side comparison:**
+
+```bash
+QUESTION="Which AWS service should I use as a vector store for large-scale RAG with hybrid search support?"
+
+echo "=== DIY RAG (pgvector + Claude Haiku 4.5) ===" && \
+curl -s -X POST "YOUR_API_ENDPOINT/query" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"question\":\"$QUESTION\",\"session_id\":\"compare-diy\"}" \
+  | python3 -m json.tool
+
+echo "=== Knowledge Base (managed + Claude 3.7 Sonnet) ===" && \
+curl -s -X POST "YOUR_API_ENDPOINT/query-kb" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"question\":\"$QUESTION\",\"session_id\":\"compare-kb\"}" \
+  | python3 -m json.tool
+```
+
+Both return **Amazon OpenSearch Serverless** as the answer. The difference is in the response structure:
+
+### DIY RAG vs Knowledge Bases — side by side
 
 | Dimension | DIY RAG | Knowledge Base |
 |-----------|---------|----------------|
-| Inline citations | Yes: `[source-key]` | No |
-| Similarity scores | Exposed | Not exposed |
-| Prompt versioning | Yes — `prompt_arn` in response | No |
+| Answer | Grounded, cited with chunk numbers and similarity scores | Grounded, cited with source file only |
+| Inline citations | Yes: `[source-key, Chunk: N]` | No |
+| Similarity scores | Exposed (e.g. 0.786) | Not exposed |
+| Prompt versioning | Yes — `prompt_arn` in every response | No |
 | Session history | Yes — DynamoDB | Not built in |
-| Chunking control | Full — 800 tokens | Fixed — 300 tokens |
-| Setup complexity | High | Low — console wizard |
+| Chunking control | Full — 800 tokens, 100 overlap | Fixed at creation — 300 tokens |
+| Model | Claude Haiku 4.5 (cheap, fast) | Claude 3.7 Sonnet (stronger) |
+| Setup complexity | High — VPC, pgvector, Lambda, IAM | Low — console wizard |
+
+Both systems return factually correct, grounded answers. The difference is observability. DIY tells you exactly what was retrieved, how similar it was, which prompt version generated the answer, and what the user asked before. Knowledge Base gives you the answer with no visibility into the why.
 
 ---
 
 ## Phase 9: Bedrock Evaluations
 
-### 9.1 Upload the Evaluation Dataset
+### 9.1 Create the Evaluation Dataset
 
-```bash
-aws s3 cp docs/aip-c01-exam-guide.md \
-  s3://rag-bedrock-docs-YOURACCOUNTID/evals/eval-dataset.jsonl
-```
+Create a JSONL file with AIP-C01 question and reference answer pairs:
 
-Or create a custom JSONL file:
 ```jsonl
 {"prompt": "Which VPC endpoint enables the RetrieveAndGenerate API?", "referenceResponse": "The bedrock-agent-runtime VPC endpoint enables the RetrieveAndGenerate and Retrieve APIs for Knowledge Bases.", "category": "question_answering"}
 {"prompt": "What percentage of the AIP-C01 exam does Domain 1 cover?", "referenceResponse": "Domain 1 (Foundation Model Integration and Data Management) covers 31% of the exam.", "category": "question_answering"}
 {"prompt": "When should I use RAG instead of fine-tuning?", "referenceResponse": "Use RAG for frequently updated knowledge, large document corpora, and when auditability matters. Use fine-tuning for style consistency, domain vocabulary, and classification tasks with static training data.", "category": "question_answering"}
+{"prompt": "What is the default chunking strategy in Bedrock Knowledge Bases?", "referenceResponse": "The default chunking strategy in Bedrock Knowledge Bases is 300 tokens with 20% overlap.", "category": "question_answering"}
+{"prompt": "Which AWS service should I use as a vector store for large-scale RAG with hybrid search support?", "referenceResponse": "Amazon OpenSearch Serverless supports both vector search and keyword search (hybrid search), making it ideal for large-scale RAG deployments.", "category": "question_answering"}
+```
+
+Upload to S3:
+
+```bash
+aws s3 cp eval-dataset.jsonl \
+  s3://rag-bedrock-docs-YOURACCOUNTID/evals/eval-dataset.jsonl
 ```
 
 ### 9.2 Create the Evaluation Job
 
 1. **Bedrock console → Evaluations → Create → Automatic: LLM as a judge**
 2. Job name: `rag-bedrock-eval-v1`
-3. Evaluator (judge): **Claude Sonnet 4.6**
+3. Evaluator (judge): **Claude Sonnet 4.6** (stronger than the evaluated model)
 4. Generator (evaluated model): **Claude Haiku 4.5**
 5. Metrics: **Correctness, Faithfulness, Completeness, Relevance**
-6. Dataset S3 URI: your JSONL path
+6. Dataset S3 URI: `s3://rag-bedrock-docs-YOURACCOUNTID/evals/eval-dataset.jsonl`
 7. Output S3 URI: `s3://rag-bedrock-docs-YOURACCOUNTID/evals/results/`
 8. IAM role: **Create and use a new service role**
 9. Create
 
 > 📸 **Screenshot**: Evaluation results showing scores for all four metrics
 
-> **AIP-C01 note**: The judge should be stronger than the evaluated model. Sonnet judges Haiku here. Faithfulness near 1.0 means the model isn't hallucinating — everything it says is traceable to the retrieved context.
+> **AIP-C01 note**: The judge should be stronger than the evaluated model. Sonnet judges Haiku here. Faithfulness near 1.0 means the model is not hallucinating — everything it says is traceable to the retrieved context. Correctness compares against your reference answers.
 
 ---
 
@@ -754,7 +802,7 @@ anthropic.claude-3-7-sonnet-20250219-v1:0
 # Cross-region inference profile (needs Marketplace subscription):
 eu.anthropic.claude-haiku-4-5-20251001-v1:0
 
-# RetrieveAndGenerate ARN (no eu. prefix):
+# RetrieveAndGenerate ARN (no eu. prefix — inference profiles rejected):
 arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-7-sonnet-20250219-v1:0
 ```
 
@@ -762,7 +810,7 @@ arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-7-sonnet-20250219
 
 - `end_turn`: normal, no intervention
 - `guardrail_intervened`: hard block
-- Substituted message: HTTP 200 with replaced content
+- Substituted message: HTTP 200 with replaced content (e.g. "Sorry, the model cannot answer this question.")
 
 ### Chunking strategies
 
@@ -794,28 +842,35 @@ TOKEN=$(aws cognito-idp initiate-auth \
   --query 'AuthenticationResult.IdToken' \
   --output text)
 
-# DIY RAG
+# Test 1: Normal query — should return grounded answer with citations
 curl -s -X POST "YOUR_API_ENDPOINT/query" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"question":"Which VPC endpoint enables the Knowledge Bases API?","session_id":"s1"}' \
+  -d '{"question":"What percentage of the AIP-C01 exam does Domain 1 cover?","session_id":"test-1"}' \
   | python3 -m json.tool
 
-# Knowledge Base
+# Test 2: Session follow-up — "it" resolves via DynamoDB history
+curl -s -X POST "YOUR_API_ENDPOINT/query" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What topics does it cover?","session_id":"test-1"}' \
+  | python3 -m json.tool
+
+# Test 3: Knowledge Base comparison — same question, different path
 curl -s -X POST "YOUR_API_ENDPOINT/query-kb" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"question":"Which VPC endpoint enables the Knowledge Bases API?","session_id":"s2"}' \
+  -d '{"question":"Which AWS service should I use for large-scale RAG with hybrid search?","session_id":"test-2"}' \
   | python3 -m json.tool
 
-# Guardrail block test
+# Test 4: Guardrail block — financial advice should be blocked
 curl -s -X POST "YOUR_API_ENDPOINT/query" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"question":"Should I invest my savings in stocks?","session_id":"s3"}' \
+  -d '{"question":"Should I invest my savings in stocks?","session_id":"test-3"}' \
   | python3 -m json.tool
 
-# Auth test — should return 401
+# Test 5: Unauthenticated — should return 401
 curl -s -X POST "YOUR_API_ENDPOINT/query" \
   -H "Content-Type: application/json" \
   -d '{"question":"test"}' | python3 -m json.tool
@@ -827,7 +882,7 @@ curl -s -X POST "YOUR_API_ENDPOINT/query" \
 
 You have built a production-shaped RAG system using only the AWS console. Every Bedrock capability relevant to AIP-C01 is covered with working infrastructure across all five exam domains.
 
-The real learning comes from the specific errors this system surfaces: the Lambda timeout from a missing `bedrock-agent-runtime` endpoint, the `RetrieveAndGenerate` rejection of cross-region inference profile ARNs, the Prompt Management CHAT-type parsing, the S3 prefix filter that protects your vector store from eval data contamination.
+The real learning comes from the specific errors this system surfaces: the Lambda timeout from a missing `bedrock-agent-runtime` endpoint, the `RetrieveAndGenerate` rejection of cross-region inference profile ARNs, the Prompt Management CHAT-type parsing, the S3 prefix filter that protects your vector store from eval data contamination, and the Guardrail contextual grounding check blocking ungrounded answers.
 
 The exam tests whether you understand how these services behave in production. Building this is the prep.
 
