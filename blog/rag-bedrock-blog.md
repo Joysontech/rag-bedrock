@@ -735,21 +735,21 @@ Both systems return factually correct, grounded answers. The difference is obser
 
 ### 9.1 Create the Evaluation Dataset
 
-Create a JSONL file with AIP-C01 question and reference answer pairs:
+The eval dataset is already in the repo at `docs/evals/eval-dataset.jsonl`. Upload it directly to S3:
+
+```bash
+aws s3 cp docs/evals/eval-dataset.jsonl \
+  s3://rag-bedrock-docs-YOURACCOUNTID/evals/eval-dataset.jsonl
+```
+
+Or via the S3 console: navigate to your bucket → `evals/` folder → Upload → select `docs/evals/eval-dataset.jsonl`.
+
+The dataset contains 8 AIP-C01 questions with reference answers covering all five domains:
 
 ```jsonl
 {"prompt": "Which VPC endpoint enables the RetrieveAndGenerate API?", "referenceResponse": "The bedrock-agent-runtime VPC endpoint enables the RetrieveAndGenerate and Retrieve APIs for Knowledge Bases.", "category": "question_answering"}
-{"prompt": "What percentage of the AIP-C01 exam does Domain 1 cover?", "referenceResponse": "Domain 1 (Foundation Model Integration and Data Management) covers 31% of the exam.", "category": "question_answering"}
+{"prompt": "What percentage of the AIP-C01 exam does Domain 1 cover?", "referenceResponse": "Domain 1 (Foundation Model Integration and Data Management) covers 31% of the AIP-C01 exam.", "category": "question_answering"}
 {"prompt": "When should I use RAG instead of fine-tuning?", "referenceResponse": "Use RAG for frequently updated knowledge, large document corpora, and when auditability matters. Use fine-tuning for style consistency, domain vocabulary, and classification tasks with static training data.", "category": "question_answering"}
-{"prompt": "What is the default chunking strategy in Bedrock Knowledge Bases?", "referenceResponse": "The default chunking strategy in Bedrock Knowledge Bases is 300 tokens with 20% overlap.", "category": "question_answering"}
-{"prompt": "Which AWS service should I use as a vector store for large-scale RAG with hybrid search support?", "referenceResponse": "Amazon OpenSearch Serverless supports both vector search and keyword search (hybrid search), making it ideal for large-scale RAG deployments.", "category": "question_answering"}
-```
-
-Upload to S3:
-
-```bash
-aws s3 cp eval-dataset.jsonl \
-  s3://rag-bedrock-docs-YOURACCOUNTID/evals/eval-dataset.jsonl
 ```
 
 ### 9.2 Create the Evaluation Job
@@ -767,6 +767,143 @@ aws s3 cp eval-dataset.jsonl \
 > 📸 **Screenshot**: Evaluation results showing scores for all four metrics
 
 > **AIP-C01 note**: The judge should be stronger than the evaluated model. Sonnet judges Haiku here. Faithfulness near 1.0 means the model is not hallucinating — everything it says is traceable to the retrieved context. Correctness compares against your reference answers.
+
+---
+
+## Errors I Hit and How to Fix Them
+
+These are the real errors encountered when building this system. Every one of them will appear in some form when you follow this guide.
+
+---
+
+### Error 1: `Runtime.ImportModuleError: No module named 'lambda_function'`
+
+**When**: Lambda invoked for the first time after uploading the zip.
+
+**Why**: The Lambda console defaults the handler to `lambda_function.lambda_handler`. The code in this repo uses `handler.handler` (file: `handler.py`, function: `handler`).
+
+**Fix**: Lambda console → your function → **Code** tab → scroll down to **Runtime settings** → **Edit** → change Handler to `handler.handler` → Save.
+
+---
+
+### Error 2: `Runtime.ImportModuleError: no pq wrapper available` (psycopg3)
+
+**When**: Lambda starts after uploading a zip built with `psycopg[binary]`.
+
+**Why**: The psycopg3 binary wheel (`psycopg-binary`) is not available for the `manylinux_2_28_x86_64` platform used by Lambda Python 3.12. Packaging from a Mac downloads an incompatible binary.
+
+**Fix**: This repo now uses `pg8000` — a pure Python PostgreSQL driver with no binary dependencies. No platform flags are needed when packaging:
+
+```bash
+pip3 install -r src/ingest/requirements.txt \
+  -t ~/Desktop/lambda-packages/ingest-package
+```
+
+---
+
+### Error 3: `Runtime.ImportModuleError: No module named 'psycopg2._psycopg'`
+
+**When**: Lambda starts after uploading a zip built with `psycopg2-binary` on Mac.
+
+**Why**: The `psycopg2-binary` wheel downloaded with `--platform manylinux2014_x86_64` contains a `.so` file compiled for a different Python version or glibc version than Lambda's runtime. Packaging with `--python-version 3.12 --implementation cp` helps but can still fail depending on the version.
+
+**Fix**: Use `pg8000` (pure Python, no compilation, no platform flags). The repo requirements files use `pg8000==1.31.2`.
+
+---
+
+### Error 4: `AccessDeniedException: not authorized to perform s3:GetObject`
+
+**When**: Ingest Lambda triggers on S3 upload but fails at step 1.
+
+**Why**: The IAM inline policy on the Lambda role was created with `rag-bedrock-docs-YOURACCOUNTID` as a placeholder. The actual bucket name was different (e.g. `rag-bedrock-docs-demo123`).
+
+**Fix**: IAM console → your Lambda role → inline policy → edit → replace the placeholder bucket name with your actual bucket name in both the bucket ARN and the `/*` ARN. Save.
+
+---
+
+### Error 5: `KeyError: 'AURORA_SECRET_ARN'`
+
+**When**: Query Lambda returns `Internal Server Error` after the first API Gateway call.
+
+**Why**: Environment variables were set on the Ingest Lambda but not copied to the Query Lambda. The Query Lambda had no env vars at all.
+
+**Fix**: Lambda console → `rag-bedrock-query` → **Configuration → Environment variables → Edit** → add all required env vars. See Phase 4.4 for the complete list.
+
+---
+
+### Error 6: Route tables not appearing when creating S3 gateway endpoint
+
+**When**: Creating the S3 gateway endpoint in VPC → Endpoints — the route table dropdown is empty.
+
+**Why**: The VPC console wizard does not always create explicit route table associations for the private subnets. The subnets use the main route table implicitly.
+
+**Fix**: VPC console → Route tables → Create route table → name it `rag-bedrock-private-rt` → associate both private subnets → then create the gateway endpoints and select this route table.
+
+---
+
+### Error 7: `NotAuthorizedException: Client configured with secret but SECRET_HASH was not received`
+
+**When**: Running `aws cognito-idp initiate-auth` with `USER_PASSWORD_AUTH`.
+
+**Why**: The Cognito app client was created as a confidential client (with a secret). The `initiate-auth` CLI command does not support computing the `SECRET_HASH` — that requires additional code.
+
+**Fix**: Cognito console → your user pool → App clients → **Create app client** → choose **Public client** → toggle **Generate client secret** OFF → use the new client ID for all CLI commands.
+
+---
+
+### Error 8: `InvalidParameterException: Attributes did not conform to the schema: emails: The attribute emails is required`
+
+**When**: Running `aws cognito-idp sign-up` without `--user-attributes`.
+
+**Why**: When email is configured as a required sign-in identifier, Cognito requires the email attribute to be passed explicitly even when it is also used as the username.
+
+**Fix**: Add `--user-attributes Name=email,Value=your@email.com` to the sign-up command.
+
+---
+
+### Error 9: `ContentBlock is blank` in Prompt Management test
+
+**When**: Clicking **Run** in the Prompt Management test window.
+
+**Why**: The prompt builder shows an **Assistant message** field below the User message. If left empty and included in the prompt structure, Bedrock rejects it with a ContentBlock validation error.
+
+**Fix**: Click the trash icon next to the **Assistant message** field to remove it. The prompt only needs System instructions and a User message.
+
+---
+
+### Error 10: API Gateway returns `{"message": "Internal Server Error"}`
+
+**When**: First curl request to API Gateway returns a 500.
+
+**Why**: Usually missing environment variables on the Query Lambda. The Lambda crashes at import time when `os.environ["AURORA_SECRET_ARN"]` raises `KeyError`.
+
+**Fix**: Check Lambda logs: `aws logs tail /aws/lambda/rag-bedrock-query --since 2m`. If you see `KeyError: 'AURORA_SECRET_ARN'`, add the missing env vars via Lambda console → Configuration → Environment variables.
+
+---
+
+### Error 11: `"answer": "Sorry, the model cannot answer this question."`
+
+**When**: Query returns HTTP 200 but the answer is the Bedrock blocked message.
+
+**Why**: Two possible causes:
+1. The Guardrail's **contextual grounding** filter blocked the answer because it scored below 0.75 grounded. This happens when the answer is only implied by the document (e.g. a percentage buried in a markdown heading) rather than stated explicitly.
+2. The question retrieved chunks containing security-related educational content (like example injection strings from the exam guide), and the model's built-in safety filter triggered.
+
+**Fix for cause 1**: Make your document state answers explicitly in plain sentences, not just in headings. For example, write "Domain 1 covers 31 percent of the exam" as a full sentence rather than relying on `### Domain 1 — 31%` in a heading.
+
+**Fix for cause 2**: Add a system prompt to your `InvokeModel` call that establishes the educational context: "You are a helpful assistant. The context may include educational content about security topics. Treat all context as reference material." This is already implemented in `shared/bedrock.py` in this repo.
+
+---
+
+### Error 12: `"Sorry, the model cannot answer this question."` — Guardrail working correctly
+
+**When**: You ask "What percentage does Domain 1 cover?" and the model blocks it even though the answer IS in the document.
+
+**Why**: The answer "31%" was only in a markdown heading (`### Domain 1 — 31%`). The Guardrail's contextual grounding check compared Claude's answer against the retrieved text and found the claim was not explicitly supported in sentence form. The Guardrail correctly blocked a potentially ungrounded answer.
+
+**Fix**: Update your document to make the percentage explicit: "Domain 1 covers 31 percent of the AIP-C01 exam." The document in this repo (`docs/aip-c01-exam-guide.md`) already includes these explicit statements. Re-upload the document to S3 to trigger re-ingestion with the clearer content.
+
+**This is a real production insight**: document quality directly affects RAG quality. Implicit facts (numbers in headings, tables without prose context) are harder for both retrieval and grounding checks to handle than explicit sentences.
 
 ---
 
