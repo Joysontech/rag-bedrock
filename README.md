@@ -1,12 +1,14 @@
 # rag-bedrock
 
-Production-shaped RAG system on AWS Bedrock — built entirely via the AWS console, no Terraform or CDK required.
+Production-shaped RAG system on AWS Bedrock — built entirely via the **AWS console**, no Terraform or CDK required.
 
 Built as hands-on prep for the **AWS Certified Generative AI Developer Professional (AIP-C01)** certification.
 
 📝 **Medium article**: [Build a Production RAG System on AWS Bedrock from Scratch](https://joysonfernandes.medium.com/build-a-production-rag-system-on-aws-bedrock-from-scratch-c6449d4de8e5)
 
 📖 **Full guide (repo)**: [blog/rag-bedrock-blog.md](./blog/rag-bedrock-blog.md)
+
+🏗️ **Prefer Terraform?** See [rag-bedrock-terraform](https://github.com/joyson-fernandes/rag-bedrock-terraform) for the equivalent IaC version.
 
 ---
 
@@ -73,16 +75,15 @@ rag-bedrock/
 │   ├── aip-c01-exam-guide.md  # RAG corpus: AIP-C01 exam guide (all 5 domains)
 │   └── evals/
 │       └── eval-dataset.jsonl # 8 AIP-C01 Q&A pairs for Bedrock Evaluations
-├── blog/
-│   └── rag-bedrock-blog.md    # Full console-first build guide
-└── README.md
+└── blog/
+    └── rag-bedrock-blog.md    # Full console-first build guide
 ```
 
 ---
 
 ## Setup
 
-Every AWS resource is created via the console. The repo only provides the Lambda code.
+Every AWS resource is created via the console. The repo only provides the Lambda source code.
 
 **Full step-by-step guide**: [Medium article](https://joysonfernandes.medium.com/build-a-production-rag-system-on-aws-bedrock-from-scratch-c6449d4de8e5) or [blog/rag-bedrock-blog.md](./blog/rag-bedrock-blog.md)
 
@@ -210,5 +211,7 @@ curl -s -X POST "YOUR_API_ENDPOINT/query" \
 - [Full build guide (repo)](./blog/rag-bedrock-blog.md)
 - [AIP-C01 exam guide doc](./docs/aip-c01-exam-guide.md)
 - [Eval dataset](./docs/evals/eval-dataset.jsonl)
+- [AIP-C01 Practice Exam](https://github.com/joyson-fernandes/aip-c01-practice-exam)
+- [Terraform version](https://github.com/joyson-fernandes/rag-bedrock-terraform)
 - [AIP-C01 Udemy course](https://www.udemy.com/course/ultimate-aws-certified-generative-ai-developer-professional/)
 - [AWS Bedrock docs](https://docs.aws.amazon.com/bedrock/latest/userguide/what-is-bedrock.html)
