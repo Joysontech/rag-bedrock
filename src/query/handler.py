@@ -20,7 +20,10 @@ sessions = dynamodb.Table(os.environ["SESSIONS_TABLE"])
 
 SESSION_TTL_DAYS = 30
 HISTORY_LIMIT    = 5
-TOP_K            = 5
+# Retrieve all chunks for small corpora — prevents missing the answer
+# because it fell just outside an arbitrary top-5 cutoff.
+# Increase this value as your document corpus grows.
+TOP_K            = 10
 
 
 def handler(event, context):
