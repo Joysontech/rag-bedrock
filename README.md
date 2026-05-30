@@ -4,7 +4,9 @@ Production-shaped RAG system on AWS Bedrock — built entirely via the AWS conso
 
 Built as hands-on prep for the **AWS Certified Generative AI Developer Professional (AIP-C01)** certification.
 
-📖 **Full guide**: [blog/rag-bedrock-blog.md](./blog/rag-bedrock-blog.md)
+📝 **Medium article**: [Build a Production RAG System on AWS Bedrock from Scratch](https://joysonfernandes.medium.com/build-a-production-rag-system-on-aws-bedrock-from-scratch-c6449d4de8e5)
+
+📖 **Full guide (repo)**: [blog/rag-bedrock-blog.md](./blog/rag-bedrock-blog.md)
 
 ---
 
@@ -38,7 +40,7 @@ All traffic stays inside AWS via VPC PrivateLink — no NAT Gateway, no internet
 | Amazon Aurora Serverless v2 | pgvector store, HNSW index, scale-to-zero |
 | AWS Lambda (Python 3.12) | Ingest and query orchestration, private VPC subnets |
 | Amazon DynamoDB | Session history with TTL (30 days) |
-| Amazon S3 | Document storage, eval datasets, Terraform state |
+| Amazon S3 | Document storage, eval datasets |
 | Amazon API Gateway | HTTP API with JWT authoriser |
 | Amazon Cognito | User Pool, public client, USER_PASSWORD_AUTH |
 | Bedrock Guardrails | Content filters, denied topics, PII masking, contextual grounding (0.75) |
@@ -72,7 +74,7 @@ rag-bedrock/
 │   └── evals/
 │       └── eval-dataset.jsonl # 8 AIP-C01 Q&A pairs for Bedrock Evaluations
 ├── blog/
-│   └── rag-bedrock-blog.md    # Full console-first build guide (dev.to post)
+│   └── rag-bedrock-blog.md    # Full console-first build guide
 └── README.md
 ```
 
@@ -82,7 +84,7 @@ rag-bedrock/
 
 Every AWS resource is created via the console. The repo only provides the Lambda code.
 
-**Full step-by-step guide**: [blog/rag-bedrock-blog.md](./blog/rag-bedrock-blog.md)
+**Full step-by-step guide**: [Medium article](https://joysonfernandes.medium.com/build-a-production-rag-system-on-aws-bedrock-from-scratch-c6449d4de8e5) or [blog/rag-bedrock-blog.md](./blog/rag-bedrock-blog.md)
 
 **Quick summary of phases:**
 
@@ -204,7 +206,8 @@ curl -s -X POST "YOUR_API_ENDPOINT/query" \
 
 ## Resources
 
-- [Full build guide](./blog/rag-bedrock-blog.md)
+- [Medium article](https://joysonfernandes.medium.com/build-a-production-rag-system-on-aws-bedrock-from-scratch-c6449d4de8e5)
+- [Full build guide (repo)](./blog/rag-bedrock-blog.md)
 - [AIP-C01 exam guide doc](./docs/aip-c01-exam-guide.md)
 - [Eval dataset](./docs/evals/eval-dataset.jsonl)
 - [AIP-C01 Udemy course](https://www.udemy.com/course/ultimate-aws-certified-generative-ai-developer-professional/)
